@@ -1,0 +1,11 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203, E402, W291, W503
+exclude =
+    .git,
+    .idea,
+    .eggs,
+    __pycache__,
+    dj_ai,
+    migrations,
+    .venv
