@@ -47,7 +47,7 @@ class Song(Base):
 
 
 class DB:
-    def __init__(self, url="sqlite:///db.sqlite3"):
+    def __init__(self, url="sqlite:///db.sqlite"):
         self.engine = create_engine(url=url, connect_args={"check_same_thread": False})
         self.Session = sessionmaker(bind=self.engine)
 
@@ -69,7 +69,6 @@ class DB:
             cookies = (
                 session.query(Cookie)
                 .filter(
-                    Cookie.session_expired > cur_time,  # noqa: E712
                     Cookie.left_counts > 0,
                     Cookie.is_working == False,  # noqa: E712
                 )
@@ -116,7 +115,6 @@ class DB:
             total_left_counts = (
                 session.query(func.sum(Cookie.left_counts))
                 .filter(
-                    Cookie.session_expired > cur_time,  # noqa: E712
                     Cookie.left_counts > 0,
                     Cookie.is_working == False,  # noqa: E712
                 )

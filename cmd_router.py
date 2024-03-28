@@ -67,7 +67,7 @@ async def new_song(message: types.Message):
         await message.answer("Cookie is is running out of usage.")
         return
     try:
-        db.update_cookie(ck.id, left_count - 1, is_expired=False, is_working=True)
+        db.update_cookie(ck.id, left_count - 1, is_working=True)
         song_file, lyric, song_name, song_urls = sg.save_songs(prompt=prompt)
         await message.bot.send_chat_action(
             message.chat.id, enums.ChatAction.UPLOAD_VOICE
@@ -84,4 +84,4 @@ async def new_song(message: types.Message):
         print(e)
         await message.answer("Error occurred")
     finally:
-        db.update_cookie(ck.id, left_count - 1, is_expired=False, is_working=False)
+        db.update_cookie(ck.id, left_count - 1,is_working=False)

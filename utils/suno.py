@@ -73,7 +73,7 @@ class SongsGen:
             sessions = r.get("sessions")[0]
             expire_at = sessions.get("expire_at")
             return datetime.fromtimestamp(int(expire_at) / 1000).strftime(
-                "%Y-%m-%d %H:%m:%S"
+                "%Y-%m-%d %H:%M:%S"
             )
 
     def _renew(self):
@@ -110,7 +110,7 @@ class SongsGen:
         response = self.session.get(url, impersonate=browser_version)
         try:
             data = response.json()
-            print("get data", data)
+            # print("get data", data) for debug
             for d in data:
                 if len(rs["song_urls"]) != 2 and (s_id := d.get("id")):
                     rs["song_urls"].append(f"https://audiopipe.suno.ai/?item_id={s_id}")
@@ -172,8 +172,8 @@ class SongsGen:
         if len(song_urls) == 0:
             print("get failed")
             return None, None
+        print(song_urls)
         # only download the first one
-        time.sleep(10)  # wait for the song to be ready, maybe need more time
         response = rget(song_urls[0], allow_redirects=False, stream=True)
         if response.status_code != 200:
             raise Exception("Could not download song")
