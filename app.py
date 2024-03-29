@@ -36,12 +36,14 @@ async def telegram_bot() -> None:
     scheduler.add_job(
         update_cookie_left_count,
         "cron",
-        hour="0,12",
+        hour="10",
+        minute="22",
         misfire_grace_time=600,
         args=[
             bot,
         ],
     )
+    scheduler.start()
     # set bot menu
     await bot.set_my_commands(menus)
     await dp.start_polling(bot)

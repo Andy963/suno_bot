@@ -1,16 +1,14 @@
-import argparse
 import json
-import os
 import re
 import time
 from datetime import datetime
 from http.cookies import SimpleCookie
-from pathlib import Path
 
 from curl_cffi import requests
 from curl_cffi.requests import Cookies
-from requests import get as rget
 from rich import print
+
+from utils.logger import FileSplitLogger
 
 ua = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
@@ -37,6 +35,8 @@ HEADERS = {
     "User-Agent": ua,
 }
 
+suno_logger = FileSplitLogger("./logs/suno.log").logger
+
 
 class SongsGen:
     def __init__(self, cookie: str) -> None:
@@ -57,6 +57,7 @@ class SongsGen:
         if r:
             sid = r.get("last_active_session_id")
         if not sid:
+            suno_logger.warning("Failed to get session id")
             raise Exception("Failed to get session id")
         self.sid = sid
         response = self.session.post(
@@ -84,8 +85,7 @@ class SongsGen:
         if "jwt" in resp.keys():
             self.session.headers["Authorization"] = f"Bearer {resp.get('jwt')}"
         else:
-            print("renew no jwt in resp:")
-            print(f"resp:{resp}")
+            suno_logger.warning("renew no jwt in resp, with resp: %s", resp)
 
     @staticmethod
     def parse_cookie_string(cookie_string):
@@ -103,17 +103,16 @@ class SongsGen:
         )
         return int(r.json()["total_credits_left"] / 10)
 
-    def _fetch_songs_metadata(self, ids):
+    def _fetch_songs_metadata(self, ids, retry_count=0, max_retries=6):
         id1, id2 = ids[:2]
-        rs = {"song_name": "", "lyric": "", "song_urls": []}
+        rs = {"song_name": "", "lyric": "", "song_ids": []}
         url = f"https://studio-api.suno.ai/api/feed/?ids={id1}%2C{id2}"
         response = self.session.get(url, impersonate=browser_version)
         try:
             data = response.json()
-            # print("get data", data) for debug
             for d in data:
-                if len(rs["song_urls"]) != 2 and (s_id := d.get("id")):
-                    rs["song_urls"].append(f"https://audiopipe.suno.ai/?item_id={s_id}")
+                if len(rs["song_ids"]) != 2 and (s_id := d.get("id")):
+                    rs["song_ids"].append(s_id)
                 mt = d.get("metadata")
                 if not rs["lyric"] and isinstance(mt, dict):
                     rs["lyric"] = re.sub(r"\[.*?\]", "", mt.get("prompt"))
@@ -124,14 +123,14 @@ class SongsGen:
                 return rs
             else:
                 time.sleep(10)
-                return self._fetch_songs_metadata(ids)
+                return self._fetch_songs_metadata(ids, retry_count)
         except Exception as e:
-            print("fetch songs metadata exception:", e)
+            suno_logger.warning("fetch songs metadata exception: %s", e)
             self._renew()
-            time.sleep(5)
-            return self._fetch_songs_metadata(ids)
+            time.sleep(2)
+            return self._fetch_songs_metadata(ids, retry_count + 1, max_retries)
 
-    def get_songs(self, prompt: str) -> dict:
+    def get_songs_info(self, prompt: str) -> dict:
         url = "https://studio-api.suno.ai/api/generate/v2/"
         self.session.headers["user-agent"] = ua
         payload = {
@@ -151,73 +150,4 @@ class SongsGen:
         response_body = response.json()
         songs_meta_info = response_body["clips"]
         request_ids = [i["id"] for i in songs_meta_info]
-        print("Waiting for results...")
         return self._fetch_songs_metadata(request_ids)
-
-    def save_songs(
-        self,
-        prompt: str,
-        output_dir: str = "./output",
-    ):
-        try:
-            song_info_dict = self.get_songs(prompt)  # make the info dict
-            song_name = song_info_dict["song_name"].replace(" ", "_")
-            lyric = song_info_dict["lyric"]
-            song_urls = song_info_dict["song_urls"]
-        except Exception as e:
-            print(f"get song info failed  with {e}")
-            raise
-        if not Path(output_dir).exists():
-            Path(output_dir).mkdir()
-        if len(song_urls) == 0:
-            print("get failed")
-            return None, None
-        print(song_urls)
-        # only download the first one
-        response = rget(song_urls[0], allow_redirects=False, stream=True)
-        if response.status_code != 200:
-            raise Exception("Could not download song")
-        # save response to file
-        song_file = Path(output_dir) / f"{song_name}.mp3"
-        with open(song_file, "wb") as output_file:
-            for chunk in response.iter_content(chunk_size=1024):
-                # If the chunk is not empty, write it to the file.
-                if chunk:
-                    output_file.write(chunk)
-            print(f"downloaded {song_name} finished")
-        return song_file.absolute(), lyric, song_name, song_urls
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-U", help="Auth cookie from browser", type=str, default="")
-    parser.add_argument(
-        "--prompt",
-        help="Prompt to generate songs for",
-        type=str,
-        required=True,
-    )
-
-    parser.add_argument(
-        "--output-dir",
-        help="Output directory",
-        type=str,
-        default="./output",
-    )
-
-    args = parser.parse_args()
-
-    # Create song generator
-    # follow old style
-    song_generator = SongsGen(
-        os.environ.get("SUNO_COOKIE") or args.U,
-    )
-    print(f"{song_generator.get_limit_left()} songs left")
-    song_generator.save_songs(
-        prompt=args.prompt,
-        output_dir=args.output_dir,
-    )
-
-
-if __name__ == "__main__":
-    main()
