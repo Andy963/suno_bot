@@ -17,6 +17,7 @@ from requests import get
 from db import db
 from utils.logger import FileSplitLogger
 from utils.suno import SongsGen
+from utils.tasks import update_cookie_left_count, update_session_date
 
 cmd_router = Router()
 bot_logger = FileSplitLogger("./logs/bot.log").logger
@@ -25,6 +26,8 @@ menu_list = [
     ("/sing", "sing a song"),
     ("/cookie", "add Cookie"),
     ("/count", "get left count"),
+    ("/update_left", "update_left_count"),
+    ("/update_expire", "update_expire_date"),
 ]
 menus = [BotCommand(command=cmd, description=dsp) for cmd, dsp in menu_list]
 
@@ -36,6 +39,11 @@ async def start(message: types.Message):
 
 @cmd_router.message(Command("count"))
 async def count(message: types.Message):
+    tg_id = message.from_user.id
+    user = db.get_user(tg_id)
+    if not user or not user.has_admin_permission():
+        await message.answer("You do not have permission to use this command")
+        return
     ct = db.get_left_count()
     await message.answer(
         f'Currently you can create at most {ct} song{"s" if ct > 1 else ""}.'
@@ -44,6 +52,11 @@ async def count(message: types.Message):
 
 @cmd_router.message(Command("cookie"))
 async def new_cookie(message: types.Message):
+    tg_id = message.from_user.id
+    user = db.get_user(tg_id)
+    if not user or not user.has_admin_permission():
+        await message.answer("You do not have permission to use this command")
+        return
     text = message.text
     cookie = text.split("/cookie")[-1]
     cookie = cookie.strip()
@@ -57,8 +70,35 @@ async def new_cookie(message: types.Message):
     await message.answer("Cookie saved")
 
 
+@cmd_router.message(Command("update_left"))
+async def update_cookie_counts(message: types.Message):
+    tg_id = message.from_user.id
+    user = db.get_user(tg_id)
+    if not user or not user.has_admin_permission():
+        await message.answer("You do not have permission to use this command")
+        return
+
+    await update_cookie_left_count(message.bot)
+
+
+@cmd_router.message(Command("update_expire"))
+async def update_session_expire_date(message: types.Message):
+    tg_id = message.from_user.id
+    user = db.get_user(tg_id)
+    if not user or not user.has_admin_permission():
+        await message.answer("You do not have permission to use this command")
+        return
+
+    await update_session_date(message.bot)
+
+
 @cmd_router.message(Command("sing"))
 async def new_song(message: types.Message):
+    tg_id = message.from_user.id
+    user = db.get_user(tg_id)
+    if not user or not user.has_admin_permission():
+        await message.answer("You do not have permission to use this command")
+        return
     text = message.text
     prompt = text.split("/sing")[-1]
     prompt = prompt.strip()
@@ -75,7 +115,7 @@ async def new_song(message: types.Message):
     if left_count <= 0:
         db.update_cookie(ck.id, left_count=0, is_working=False)
         await message.answer(
-            f"Cookie {ck.id} is is running out of usage."
+            f"Cookie: {ck.id} is is running out of usage."
             f"and disabled, please try again."
         )
         return

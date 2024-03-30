@@ -7,9 +7,11 @@ from datetime import datetime, timedelta
 from functools import partial
 
 import pytz
-from sqlalchemy import Column, Integer, String, JSON, Boolean, func
+from sqlalchemy import Column, Integer, String, JSON, Boolean, func, Enum, \
+    ForeignKey
 from sqlalchemy import create_engine, DateTime
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, \
+    joinedload
 
 Base = declarative_base()
 
@@ -46,6 +48,34 @@ class Song(Base):
     updated = Column(DateTime, default=get_cur_time, onupdate=get_cur_time)
 
 
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False)
+    permissions = Column(Integer, nullable=False)
+
+    USER = 1
+    ADMIN = 2
+    ROOT = 4
+
+    name_enum = Column(Enum("User", "Admin", "Root", name="role_name"))
+
+
+class User(Base):
+    __tablename__ = "user"
+    id = Column(Integer, primary_key=True)
+    tg_id = Column(String, unique=True)
+    name = Column(String, nullable=True)
+    role_id = Column(Integer, ForeignKey("roles.id"))
+    role = relationship("Role")
+    created = Column(DateTime, default=get_cur_time)
+    updated = Column(DateTime, default=get_cur_time, onupdate=get_cur_time)
+
+    def has_admin_permission(self):
+        return self.role.permissions >= Role.ADMIN
+
+
 class DB:
     def __init__(self, url="sqlite:///db.sqlite"):
         self.engine = create_engine(url=url, connect_args={"check_same_thread": False})
@@ -56,9 +86,11 @@ class DB:
             cookies = session.query(Cookie).all()
             return cookies
 
-    def update_cookie_session_expired(self, cookie, dt):
+    def update_session_expired(self, cookie_id, dt):
         with self.Session() as session:
+            cookie = session.query(Cookie).filter(Cookie.id == cookie_id).first()
             cookie.session_expired = dt
+            cookie.updated = get_cur_time()
             session.commit()
             return cookie
 
@@ -70,6 +102,7 @@ class DB:
                 session.query(Cookie)
                 .filter(
                     Cookie.left_counts > 0,
+                    Cookie.session_expired > cur_time,
                     Cookie.is_working == False,  # noqa: E712
                 )
                 .first()
@@ -106,6 +139,7 @@ class DB:
             if session_expired:
                 cookie.session_expired = session_expired
             cookie.is_working = is_working
+            cookie.updated = get_cur_time()
             session.commit()
             return cookie
 
@@ -115,6 +149,7 @@ class DB:
             total_left_counts = (
                 session.query(func.sum(Cookie.left_counts))
                 .filter(
+                    Cookie.session_expired > cur_time,
                     Cookie.left_counts > 0,
                     Cookie.is_working == False,  # noqa: E712
                 )
@@ -132,6 +167,16 @@ class DB:
             session.add(song)
             session.commit()
             return song
+
+    def get_user(self, tg_id: str):
+        with self.Session() as session:
+            user = (
+                session.query(User)
+                .options(joinedload(User.role))
+                .filter(User.tg_id == tg_id)
+                .first()
+            )
+            return user
 
 
 db = DB()

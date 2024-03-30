@@ -10,7 +10,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import config
 from cmd_router import cmd_router, menus
-from utils.tasks import update_cookie_session_date, update_cookie_left_count
+from utils.tasks import update_cookie_left_count, update_session_date, \
+    notify_session_expire
 
 # Bot token can be obtained via https://t.me/BotFather
 
@@ -25,7 +26,7 @@ async def telegram_bot() -> None:
     bot = Bot(config.telegram_token)
     scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
     scheduler.add_job(
-        update_cookie_session_date,
+        update_session_date,
         "cron",
         hour="3",
         misfire_grace_time=600,
@@ -36,8 +37,16 @@ async def telegram_bot() -> None:
     scheduler.add_job(
         update_cookie_left_count,
         "cron",
-        hour="10",
-        minute="22",
+        hour="5",
+        misfire_grace_time=600,
+        args=[
+            bot,
+        ],
+    )
+    scheduler.add_job(
+        notify_session_expire,
+        "cron",
+        hour="6",
         misfire_grace_time=600,
         args=[
             bot,

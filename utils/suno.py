@@ -66,21 +66,31 @@ class SongsGen:
         data = response.json()
         return data.get("jwt")
 
-    def get_session_expire_date(self):
+    def get_session_expire_date(self) -> [datetime, None]:
+        # for Setting both the 'Origin' and 'Authorization' headers is forbidden
+        origin = None
+        if "Origin" in self.session.headers:
+            origin = self.session.headers.pop("Origin")
         response = self.session.get(get_session_url, impersonate=browser_version)
+        if origin:
+            self.session.headers["Origin"] = origin
         data = response.json()
+        # suno_logger.info("get_session_expire_date data: %s", data)
         r = data.get("response")
         if r and r.get("sessions"):
             sessions = r.get("sessions")[0]
             expire_at = sessions.get("expire_at")
-            return datetime.fromtimestamp(int(expire_at) / 1000).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            return datetime.fromtimestamp(int(expire_at) / 1000)
 
     def _renew(self):
+        origin = None
+        if 'Origin' in  self.session.headers:
+            origin = self.session.pop('Origin')
         response = self.session.post(
             exchange_token_url.format(sid=self.sid), impersonate=browser_version
         )
+        if origin:
+            self.session.headers['Origin'] = origin
         resp = response.json()
         if "jwt" in resp.keys():
             self.session.headers["Authorization"] = f"Bearer {resp.get('jwt')}"
