@@ -6,7 +6,6 @@ from http.cookies import SimpleCookie
 
 from curl_cffi import requests
 from curl_cffi.requests import Cookies
-from rich import print
 
 from utils.logger import FileSplitLogger
 
@@ -84,8 +83,8 @@ class SongsGen:
 
     def _renew(self):
         origin = None
-        if 'Origin' in  self.session.headers:
-            origin = self.session.pop('Origin')
+        if 'Origin' in self.session.headers:
+            origin = self.session.headers.pop('Origin')
         response = self.session.post(
             exchange_token_url.format(sid=self.sid), impersonate=browser_version
         )
@@ -155,7 +154,7 @@ class SongsGen:
             impersonate=browser_version,
         )
         if not response.ok:
-            print("response.text", response.text)
+            suno_logger.error("response.text", response.text)
             raise Exception(f"Error response {str(response)}")
         response_body = response.json()
         songs_meta_info = response_body["clips"]
