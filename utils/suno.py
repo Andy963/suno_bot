@@ -34,7 +34,7 @@ HEADERS = {
     "User-Agent": ua,
 }
 
-suno_logger = FileSplitLogger("./logs/suno.log").logger
+suno_logger = FileSplitLogger("./logs/suno.log")
 
 
 class SongsGen:
@@ -160,3 +160,8 @@ class SongsGen:
         songs_meta_info = response_body["clips"]
         request_ids = [i["id"] for i in songs_meta_info]
         return self._fetch_songs_metadata(request_ids)
+
+__all__ = [
+    "SongsGen",
+    
+]

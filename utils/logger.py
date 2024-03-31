@@ -10,16 +10,16 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
-class SingletonMeta(type):
-    _instances = {}
+class Singleton:
+    __instance = None
 
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = super().__new__(cls)
+        return cls.__instance
 
 
-class FileSplitLogger(metaclass=SingletonMeta):
+class FileSplitLogger(Singleton):
     _loggers = {}
 
     def __init__(
@@ -44,6 +44,11 @@ class FileSplitLogger(metaclass=SingletonMeta):
 
         log_dir = Path(filename).parent
         log_dir.mkdir(parents=True, exist_ok=True)
+        if not Path(filename).exists():
+            (log_dir / Path(filename).name).touch()
+
+        if not Path(filename).is_file():
+            raise ValueError(f"{filename} is not a file")
 
         format_str = logging.Formatter(fmt)
 
@@ -78,6 +83,10 @@ class FileSplitLogger(metaclass=SingletonMeta):
     def critical(self, msg, *args, **kwargs):
         self.logger.critical(msg, *args, **kwargs)
 
+
+__all__ = [
+    "FileSplitLogger",
+]
 
 if __name__ == "__main__":
     logger1 = FileSplitLogger("./logs/test.log", level=logging.DEBUG)

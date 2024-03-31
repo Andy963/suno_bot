@@ -19,8 +19,8 @@ from utils.logger import FileSplitLogger
 from utils.suno import SongsGen
 from utils.tasks import update_cookie_left_count, update_session_date
 
+bot_logger = FileSplitLogger(filename="./logs/cmd_router.log")
 cmd_router = Router()
-bot_logger = FileSplitLogger("./logs/bot.log").logger
 menu_list = [
     ("/start", "Start"),
     ("/sing", "sing a song"),

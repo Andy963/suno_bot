@@ -12,7 +12,7 @@ from db import db
 from utils.logger import FileSplitLogger
 from utils.suno import SongsGen
 
-task_logger = FileSplitLogger("./logs/tasks.log").logger
+task_logger = FileSplitLogger("./logs/tasks.log")
 
 
 async def update_session_date(bot: Bot):
